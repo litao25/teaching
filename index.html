@@ -1,0 +1,290 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>중국어 단어 매칭 게임 - 국가의 사람들</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 {
+            color: #e74c3c;
+            margin-bottom: 10px;
+        }
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            width: 600px;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            width: 600px;
+        }
+        .card {
+            height: 120px;
+            background-color: #3498db;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+        }
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .card-front {
+            background-color: #e74c3c;
+            transform: rotateY(0deg);
+        }
+        .card-back {
+            background-color: #2ecc71;
+            transform: rotateY(180deg);
+        }
+        .card.matched {
+            visibility: hidden;
+        }
+        .restart-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .restart-btn:hover {
+            background-color: #c0392b;
+        }
+        .panda-icon {
+            font-size: 50px;
+        }
+    </style>
+</head>
+<body>
+    <h1>중국어 단어 매칭 게임</h1>
+    <p>같은 단어의 병음과 한국어 번호를 찾아 맞추세요!</p>
+    
+    <div class="game-info">
+        <div>시간: <span id="time">0</span>초</div>
+        <div>점수: <span id="score">0</span></div>
+    </div>
+    
+    <div class="game-board" id="gameBoard"></div>
+    
+    <button class="restart-btn" onclick="startGame()">게임 다시 시작</button>
+
+    <script>
+        // 게임 데이터
+        const words = [
+            { chinese: "中国人", pinyin: "Zhōngguórén", korean: "중국인" },
+            { chinese: "韩国人", pinyin: "Hánguórén", korean: "한국인" },
+            { chinese: "日本人", pinyin: "Rìběnrén", korean: "일본인" },
+            { chinese: "美国人", pinyin: "Měiguórén", korean: "미국인" },
+            { chinese: "英国人", pinyin: "Yīngguórén", korean: "영국인" },
+            { chinese: "法国人", pinyin: "Fǎguórén", korean: "프랑스인" }
+        ];
+
+        // 팬더 캐릭터 이모지 (다양한 팬더 표정)
+        const pandaEmojis = ["🐼", "🐻", "🧸", "🐾", "🎋", "🎍"];
+
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let score = 0;
+        let time = 0;
+        let timer;
+        let gameStarted = false;
+
+        // 게임 초기화
+        function initGame() {
+            // 카드 쌍 생성 (병음과 한국어 각각 한 장)
+            let cardPairs = [];
+            words.forEach((word, index) => {
+                cardPairs.push({ 
+                    type: 'pinyin', 
+                    content: word.pinyin, 
+                    word: word.chinese, 
+                    emoji: pandaEmojis[index] 
+                });
+                cardPairs.push({ 
+                    type: 'korean', 
+                    content: word.korean, 
+                    word: word.chinese, 
+                    emoji: pandaEmojis[index] 
+                });
+            });
+
+            // 카드 섞기
+            cards = shuffleArray(cardPairs);
+            
+            // 게임 보드 렌더링
+            renderGameBoard();
+        }
+
+        // 게임 보드 렌더링
+        function renderGameBoard() {
+            const gameBoard = document.getElementById('gameBoard');
+            gameBoard.innerHTML = '';
+            
+            cards.forEach((card, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'card';
+                cardElement.dataset.index = index;
+                
+                // 카드가 매치된 경우 matched 클래스 추가
+                if (card.matched) {
+                    cardElement.classList.add('matched');
+                }
+                
+                // 카드가 뒤집힌 경우 flipped 클래스 추가
+                if (card.flipped) {
+                    cardElement.classList.add('flipped');
+                }
+                
+                // 카드 앞면 (팬더 캐릭터)
+                const frontFace = document.createElement('div');
+                frontFace.className = 'card-face card-front';
+                frontFace.innerHTML = `<div class="panda-icon">${card.emoji}</div>`;
+                
+                // 카드 뒷면 (병음 또는 한국어)
+                const backFace = document.createElement('div');
+                backFace.className = 'card-face card-back';
+                backFace.textContent = card.content;
+                
+                cardElement.appendChild(frontFace);
+                cardElement.appendChild(backFace);
+                
+                cardElement.addEventListener('click', () => flipCard(index));
+                gameBoard.appendChild(cardElement);
+            });
+        }
+
+        // 카드 뒤집기
+        function flipCard(index) {
+            // 게임이 시작되지 않은 경우 게임 시작
+            if (!gameStarted) {
+                startTimer();
+                gameStarted = true;
+            }
+            
+            const card = cards[index];
+            
+            // 카드가 이미 매치되었거나 뒤집혀 있거나 이미 2장이 뒤집혀 있는 경우 무시
+            if (card.matched || card.flipped || flippedCards.length >= 2) {
+                return;
+            }
+            
+            // 카드 뒤집기
+            card.flipped = true;
+            flippedCards.push(index);
+            
+            // 게임 보드 다시 렌더링
+            renderGameBoard();
+            
+            // 2장의 카드가 뒤집혔는지 확인
+            if (flippedCards.length === 2) {
+                const card1 = cards[flippedCards[0]];
+                const card2 = cards[flippedCards[1]];
+                
+                // 같은 단어의 병음과 한국어 번역인지 확인
+                if (card1.word === card2.word && card1.type !== card2.type) {
+                    // 매치 성공
+                    card1.matched = true;
+                    card2.matched = true;
+                    matchedPairs++;
+                    score += 10;
+                    document.getElementById('score').textContent = score;
+                    
+                    // 뒤집힌 카드 배열 비우기
+                    flippedCards = [];
+                    
+                    // 게임 종료 확인
+                    if (matchedPairs === words.length) {
+                        endGame();
+                    }
+                } else {
+                    // 매치 실패, 1초 후 다시 뒤집기
+                    setTimeout(() => {
+                        card1.flipped = false;
+                        card2.flipped = false;
+                        flippedCards = [];
+                        renderGameBoard();
+                    }, 1000);
+                }
+            }
+        }
+
+        // 타이머 시작
+        function startTimer() {
+            time = 0;
+            document.getElementById('time').textContent = time;
+            timer = setInterval(() => {
+                time++;
+                document.getElementById('time').textContent = time;
+            }, 1000);
+        }
+
+        // 게임 종료
+        function endGame() {
+            clearInterval(timer);
+            alert(`게임 종료!\n점수: ${score}\n소요 시간: ${time}초`);
+        }
+
+        // 게임 시작
+        function startGame() {
+            clearInterval(timer);
+            cards = [];
+            flippedCards = [];
+            matchedPairs = 0;
+            score = 0;
+            time = 0;
+            gameStarted = false;
+            document.getElementById('score').textContent = score;
+            document.getElementById('time').textContent = time;
+            initGame();
+        }
+
+        // 배열 섞기 함수
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // 게임 초기화
+        startGame();
+    </script>
+</body>
+</html>
